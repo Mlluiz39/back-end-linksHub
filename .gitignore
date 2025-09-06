@@ -1,0 +1,59 @@
+# ------------------------
+# Node.js
+# ------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------
+# Environment variables
+# ------------------------
+.env
+
+# ------------------------
+# Logs
+# ------------------------
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ------------------------
+# Build / Output
+# ------------------------
+dist/
+build/
+*.tsbuildinfo
+
+# ------------------------
+# OS / Editor
+# ------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# ------------------------
+# PostgreSQL
+# ------------------------
+*.sql
+*.dump
+
+# ------------------------
+# Docker
+# ------------------------
+docker-compose.override.yml
+*.dockerignore
+*.env.*.local
+
+# ------------------------
+# Misc
+# ------------------------
+coverage/
+*.tgz
+.pnpm-debug.log*
