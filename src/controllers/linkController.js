@@ -28,7 +28,7 @@ export const googleAuth = async (req, res) => {
        VALUES ($1, $2, $3)
        ON CONFLICT (google_id) DO UPDATE SET nome = $2, email = $3
        RETURNING *`,
-      [payload.sub, payload.name, payload.email]
+      [payload.sub, payload.nome, payload.email]
     )
 
     const user = result.rows[0]

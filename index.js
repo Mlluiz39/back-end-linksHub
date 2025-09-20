@@ -18,6 +18,6 @@ app.use(
 // Rotas
 app.use('/', linkRoutes)
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor rodando em http://0.0.0.0:${PORT}`)
+app.listen(PORT, 'localhost', () => {
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
 })
