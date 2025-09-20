@@ -1,11 +1,26 @@
-import express from "express";
-import { getLinks, createLink, getLinkById, deleteLink } from "../controllers/linkController.js";
+import express from 'express'
+import {
+  googleAuth,
+  getLinks,
+  createLink,
+  getLinkById,
+  updateLink,
+  deleteLink,
+  authMiddleware,
+} from '../controllers/linkController.js'
 
-const router = express.Router();
+const router = express.Router()
 
-router.get("/", getLinks);
-router.post("/", createLink);
-router.get("/:id", getLinkById);
-router.delete("/:id", deleteLink);
+// 🔓 Rota pública - Login com Google
+router.post('/auth/google', googleAuth)
 
-export default router;
+// 🔒 Rotas protegidas - CRUD de links
+router.use(authMiddleware) // tudo abaixo exige token válido
+
+router.get('/links', getLinks)
+router.post('/links', createLink)
+router.get('/links/:id', getLinkById)
+router.put('/links/:id', updateLink)
+router.delete('/links/:id', deleteLink)
+
+export default router
