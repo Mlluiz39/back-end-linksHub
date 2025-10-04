@@ -1,19 +1,20 @@
-import pkg from 'pg';
-import dotenv from 'dotenv';
+import pkg from 'pg'
+const { Pool } = pkg
+import dotenv from 'dotenv'
 
-dotenv.config(); // Carrega variáveis do .env
-const { Client } = pkg;
+dotenv.config()
 
-const client = new Client({
-  user: process.env.PG_USER,
-  host: process.env.PG_HOST,
-  database: process.env.PG_DATABASE,
-  password: process.env.PG_PASSWORD,
- port: process.env.PG_PORT,
-});
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+})
 
-client.connect()
+pool
+  .connect()
   .then(() => console.log('Conectado ao PostgreSQL'))
-  .catch(err => console.error('Erro ao conectar ao PostgreSQL:', err));
+  .catch(err => console.error('Erro ao conectar ao PostgreSQL:', err))
 
-export default client;
+export default pool
