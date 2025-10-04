@@ -1,12 +1,14 @@
 import { OAuth2Client } from 'google-auth-library'
+import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import pool from '../lib/db.js'
+import dotenv from 'dotenv'
 
-const client = new OAuth2Client(
-  '37636929163-4l0tgcuaqnp4csarn2kqbalbl0diejpo.apps.googleusercontent.com'
-)
+dotenv.config()
 
-const JWT_SECRET = process.env.JWT_SECRET || 'chave_super_secreta'
+const client = new OAuth2Client(process.env.CLIENT_JWT)
+
+const JWT_SECRET = process.env.JWT_SECRET
 
 // 🔹 Autenticação com Google + salvar usuário + gerar JWT
 export const googleAuth = async (req, res) => {
@@ -17,15 +19,14 @@ export const googleAuth = async (req, res) => {
     // Verifica token do Google
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience:
-        '37636929163-4l0tgcuaqnp4csarn2kqbalbl0diejpo.apps.googleusercontent.com',
+      audience: process.env.CLIENT_JWT,
     })
     const payload = ticket.getPayload()
 
     // Salva/atualiza usuário
     const result = await pool.query(
-      `INSERT INTO users (google_id, nome, email)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (google_id, nome, email, password)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (google_id) DO UPDATE SET nome = $2, email = $3
        RETURNING *`,
       [payload.sub, payload.nome, payload.email]
@@ -35,7 +36,7 @@ export const googleAuth = async (req, res) => {
 
     // Cria JWT próprio (com id do usuário no nosso banco)
     const tokenJwt = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, password: user.password },
       JWT_SECRET,
       { expiresIn: '7d' }
     )
@@ -61,6 +62,82 @@ export const authMiddleware = (req, res, next) => {
     next()
   } catch (err) {
     return res.status(403).json({ error: 'Token expirado ou inválido' })
+  }
+}
+
+export const registerUser = async (req, res) => {
+  const { name, email, password } = req.body
+
+  if (!name || !email || !password) {
+    return res
+      .status(400)
+      .json({ error: 'Nome, email e senha são obrigatórios' })
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [name, email, hashedPassword]
+    )
+
+    const user = result.rows[0]
+
+    const tokenJwt = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    res.status(201).json({ user, token: tokenJwt })
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'E-mail já cadastrado' }) // Erro de chave única
+    }
+
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao cadastrar usuário' })
+  }
+}
+
+// 🔹 Login com email e senha
+export const emailPasswordLogin = async (req, res) => {
+  const { email, password } = req.body
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email e senha são obrigatórios' })
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [
+      email,
+    ])
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Usuário não encontrado' })
+    }
+
+    const user = result.rows[0]
+
+    const checkPassword = await bcrypt.compare(password, user.password)
+
+    if (!checkPassword) {
+      return res.status(401).json({ error: 'Senha incorreta' })
+    }
+
+    const tokenJwt = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    res.json({ user, token: tokenJwt })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao realizar login' })
   }
 }
 

@@ -12,7 +12,7 @@ import {
 const router = express.Router()
 
 // 🔓 Rota pública - Login com Google
-router.post('/auth/google', googleAuth)
+router.post('/auth/login', googleAuth)
 
 // 🔒 Rotas protegidas - CRUD de links
 router.use(authMiddleware) // tudo abaixo exige token válido
