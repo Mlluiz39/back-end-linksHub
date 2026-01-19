@@ -1,77 +1,111 @@
-import pool from '../lib/db.js'
+import supabase from '../lib/supabase.js'
+import { z } from 'zod'
+
+// Schemas
+const linkSchema = z.object({
+  title: z.string().min(1, 'Título é obrigatório'),
+  url: z.string().url('URL inválida'),
+})
 
 // Listar links do usuário
 export const getLinks = async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM links WHERE user_id=$1 ORDER BY id ASC',
-      [req.user.userId]
-    )
-    res.json({ links: result.rows })
+    const { data, error } = await supabase
+      .from('links')
+      .select('*')
+      .eq('user_id', req.user.userId)
+      .order('id', { ascending: true })
+
+    if (error) throw error
+    res.json({ links: data })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Erro ao listar links:', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 }
 
 // Criar link
 export const createLink = async (req, res) => {
-  const { title, url } = req.body
-  if (!title || !url)
-    return res.status(400).json({ error: 'Título e URL são obrigatórios' })
-
   try {
-    const result = await pool.query(
-      'INSERT INTO links (title,url,user_id) VALUES ($1,$2,$3) RETURNING *',
-      [title, url, req.user.userId]
-    )
-    res.status(201).json({ link: result.rows[0] })
+    // Validação
+    const { title, url } = linkSchema.parse(req.body)
+
+    const { data, error } = await supabase
+      .from('links')
+      .insert([{ title, url, user_id: req.user.userId }])
+      .select()
+
+    if (error) throw error
+    res.status(201).json({ link: data[0] })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message })
+    }
+    console.error('Erro ao criar link:', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 }
 
 // Buscar link por ID
 export const getLinkById = async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM links WHERE id=$1 AND user_id=$2',
-      [req.params.id, req.user.userId]
-    )
-    if (!result.rows.length)
-      return res.status(404).json({ error: 'Link não encontrado' })
-    res.json({ link: result.rows[0] })
+    const { data, error } = await supabase
+      .from('links')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.userId)
+      .single()
+
+    if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Link não encontrado' })
+    res.json({ link: data })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Erro ao buscar link:', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 }
 
 // Atualizar link
 export const updateLink = async (req, res) => {
-  const { title, url } = req.body
   try {
-    const result = await pool.query(
-      'UPDATE links SET title=$1,url=$2 WHERE id=$3 AND user_id=$4 RETURNING *',
-      [title, url, req.params.id, req.user.userId]
-    )
-    if (!result.rows.length)
+    const { title, url } = linkSchema.parse(req.body)
+
+    const { data, error } = await supabase
+      .from('links')
+      .update({ title, url })
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.userId)
+      .select()
+
+    if (error) throw error
+    if (!data.length)
       return res.status(404).json({ error: 'Link não encontrado' })
-    res.json({ link: result.rows[0] })
+    res.json({ link: data[0] })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message })
+    }
+    console.error('Erro ao atualizar link:', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 }
 
 // Deletar link
 export const deleteLink = async (req, res) => {
   try {
-    const result = await pool.query(
-      'DELETE FROM links WHERE id=$1 AND user_id=$2 RETURNING *',
-      [req.params.id, req.user.userId]
-    )
-    if (!result.rows.length)
+    const { data, error } = await supabase
+      .from('links')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.userId)
+      .select()
+
+    if (error) throw error
+    if (!data.length)
       return res.status(404).json({ error: 'Link não encontrado' })
-    res.json({ message: 'Link deletado com sucesso', link: result.rows[0] })
+    res.json({ message: 'Link deletado com sucesso', link: data[0] })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Erro ao deletar link:', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 }

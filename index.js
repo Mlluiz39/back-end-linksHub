@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import swaggerUi from 'swagger-ui-express'
+import swaggerSpecs from './src/config/swagger.js'
 import authRoutes from './src/routes/authRoutes.js'
 import linkRoutes from './src/routes/linkRoutes.js'
 
@@ -32,6 +34,9 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.send('🚀 API MLLuizDevTech rodando com sucesso!')
 })
+
+// Documentação Swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs))
 
 // Rotas
 app.use('/auth', authRoutes)
