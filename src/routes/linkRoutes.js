@@ -6,6 +6,8 @@ import {
   getLinkById,
   updateLink,
   deleteLink,
+  backupLinks,
+  restoreLinks,
 } from '../controllers/linkController.js'
 
 const router = express.Router()
@@ -48,6 +50,46 @@ router.use(authMiddleware)
  *                         type: integer
  */
 router.get('/', getLinks)
+
+/**
+ * @swagger
+ * /links/backup:
+ *   get:
+ *     summary: Exporta todos os links do usuário (backup)
+ *     tags: [Links]
+ *     responses:
+ *       200:
+ *         description: Arquivo JSON com os links
+ */
+router.get('/backup', backupLinks)
+
+/**
+ * @swagger
+ * /links/restore:
+ *   post:
+ *     summary: Importa links de um backup (restore)
+ *     tags: [Links]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               links:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                     url:
+ *                       type: string
+ *     responses:
+ *       201:
+ *         description: Links importados com sucesso
+ */
+router.post('/restore', restoreLinks)
 
 /**
  * @swagger

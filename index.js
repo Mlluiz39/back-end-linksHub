@@ -32,7 +32,7 @@ app.use((req, res, next) => {
 
 // Rota raiz
 app.get('/', (req, res) => {
-  res.send('🚀 API MLLuizDevTech rodando com sucesso!')
+  res.send('🚀 API linksHub rodando com sucesso!')
 })
 
 // Documentação Swagger
