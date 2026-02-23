@@ -1,4 +1,4 @@
-import supabase from '../lib/supabase.js'
+import pool from '../lib/db.js'
 import { z } from 'zod'
 
 // Schemas
@@ -10,14 +10,11 @@ const linkSchema = z.object({
 // Listar links do usuário
 export const getLinks = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('links')
-      .select('*')
-      .eq('user_id', req.user.userId)
-      .order('id', { ascending: true })
-
-    if (error) throw error
-    res.json({ links: data })
+    const { rows } = await pool.query(
+      'SELECT * FROM links WHERE user_id = $1 ORDER BY id ASC',
+      [req.user.userId]
+    )
+    res.json({ links: rows })
   } catch (err) {
     console.error('Erro ao listar links:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -27,16 +24,13 @@ export const getLinks = async (req, res) => {
 // Criar link
 export const createLink = async (req, res) => {
   try {
-    // Validação
     const { title, url } = linkSchema.parse(req.body)
 
-    const { data, error } = await supabase
-      .from('links')
-      .insert([{ title, url, user_id: req.user.userId }])
-      .select()
-
-    if (error) throw error
-    res.status(201).json({ link: data[0] })
+    const { rows } = await pool.query(
+      'INSERT INTO links (title, url, user_id) VALUES ($1, $2, $3) RETURNING *',
+      [title, url, req.user.userId]
+    )
+    res.status(201).json({ link: rows[0] })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: err.errors[0].message })
@@ -49,16 +43,12 @@ export const createLink = async (req, res) => {
 // Buscar link por ID
 export const getLinkById = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('links')
-      .select('*')
-      .eq('id', req.params.id)
-      .eq('user_id', req.user.userId)
-      .single()
-
-    if (error) throw error
-    if (!data) return res.status(404).json({ error: 'Link não encontrado' })
-    res.json({ link: data })
+    const { rows } = await pool.query(
+      'SELECT * FROM links WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.userId]
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Link não encontrado' })
+    res.json({ link: rows[0] })
   } catch (err) {
     console.error('Erro ao buscar link:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -70,17 +60,12 @@ export const updateLink = async (req, res) => {
   try {
     const { title, url } = linkSchema.parse(req.body)
 
-    const { data, error } = await supabase
-      .from('links')
-      .update({ title, url })
-      .eq('id', req.params.id)
-      .eq('user_id', req.user.userId)
-      .select()
-
-    if (error) throw error
-    if (!data.length)
-      return res.status(404).json({ error: 'Link não encontrado' })
-    res.json({ link: data[0] })
+    const { rows } = await pool.query(
+      'UPDATE links SET title = $1, url = $2 WHERE id = $3 AND user_id = $4 RETURNING *',
+      [title, url, req.params.id, req.user.userId]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'Link não encontrado' })
+    res.json({ link: rows[0] })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: err.errors[0].message })
@@ -93,17 +78,12 @@ export const updateLink = async (req, res) => {
 // Deletar link
 export const deleteLink = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('links')
-      .delete()
-      .eq('id', req.params.id)
-      .eq('user_id', req.user.userId)
-      .select()
-
-    if (error) throw error
-    if (!data.length)
-      return res.status(404).json({ error: 'Link não encontrado' })
-    res.json({ message: 'Link deletado com sucesso', link: data[0] })
+    const { rows } = await pool.query(
+      'DELETE FROM links WHERE id = $1 AND user_id = $2 RETURNING *',
+      [req.params.id, req.user.userId]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'Link não encontrado' })
+    res.json({ message: 'Link deletado com sucesso', link: rows[0] })
   } catch (err) {
     console.error('Erro ao deletar link:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -113,13 +93,11 @@ export const deleteLink = async (req, res) => {
 // Backup (Exportar links)
 export const backupLinks = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('links')
-      .select('title, url')
-      .eq('user_id', req.user.userId)
-
-    if (error) throw error
-    res.json({ links: data })
+    const { rows } = await pool.query(
+      'SELECT title, url FROM links WHERE user_id = $1',
+      [req.user.userId]
+    )
+    res.json({ links: rows })
   } catch (err) {
     console.error('Erro ao fazer backup:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -134,26 +112,33 @@ export const restoreLinks = async (req, res) => {
       return res.status(400).json({ error: 'Formato inválido. Esperado um array de links.' })
     }
 
-    const linksToInsert = links.map(link => {
-      try {
-        const { title, url } = linkSchema.parse(link)
-        return { title, url, user_id: req.user.userId }
-      } catch (e) {
-        return null // Ignora links inválidos
-      }
-    }).filter(Boolean)
+    const linksToInsert = links
+      .map(link => {
+        try {
+          const { title, url } = linkSchema.parse(link)
+          return { title, url }
+        } catch {
+          return null
+        }
+      })
+      .filter(Boolean)
 
     if (linksToInsert.length === 0) {
       return res.status(400).json({ error: 'Nenhum link válido para importar.' })
     }
 
-    const { data, error } = await supabase
-      .from('links')
-      .insert(linksToInsert)
-      .select()
+    // Monta INSERT com múltiplos valores usando parâmetros
+    const values = linksToInsert.flatMap(({ title, url }) => [title, url, req.user.userId])
+    const placeholders = linksToInsert
+      .map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`)
+      .join(', ')
 
-    if (error) throw error
-    res.status(201).json({ message: `${data.length} links importados com sucesso.`, links: data })
+    const { rows } = await pool.query(
+      `INSERT INTO links (title, url, user_id) VALUES ${placeholders} RETURNING *`,
+      values
+    )
+
+    res.status(201).json({ message: `${rows.length} links importados com sucesso.`, links: rows })
   } catch (err) {
     console.error('Erro ao restaurar links:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-import supabase from '../lib/supabase.js'
+import pool from '../lib/db.js'
 import dotenv from 'dotenv'
 import { z } from 'zod'
 
@@ -44,28 +44,25 @@ export const authMiddleware = (req, res, next) => {
 // Registro manual
 export const registerUser = async (req, res) => {
   try {
-    // Validação
     const { name, email, password } = registerSchema.parse(req.body)
 
     const hashedPassword = await bcrypt.hash(password, 10)
-    
-    // Inserir no Supabase
-    const { data, error } = await supabase
-      .from('users')
-      .insert([{ name, email, password: hashedPassword }])
-      .select()
 
-    if (error) {
-       if (error.code === '23505') return res.status(409).json({ error: 'E-mail já cadastrado' })
-       throw error
-    }
+    const { rows } = await pool.query(
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
+      [name, email, hashedPassword]
+    )
 
-    const user = data[0]
+    const user = rows[0]
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
     res.status(201).json({ user, token })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: err.errors[0].message })
+    }
+    // Violação de unique constraint (e-mail duplicado)
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'E-mail já cadastrado' })
     }
     console.error('Erro no registro:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -75,24 +72,18 @@ export const registerUser = async (req, res) => {
 // Login email/senha
 export const emailPasswordLogin = async (req, res) => {
   try {
-    // Validação
     const { email, password } = loginSchema.parse(req.body)
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single()
+    const { rows } = await pool.query(
+      'SELECT * FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    )
 
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
-    
-    if (!data) return res.status(401).json({ error: 'Credenciais inválidas' }) // Generic msg
+    const user = rows[0]
+    if (!user) return res.status(401).json({ error: 'Credenciais inválidas' })
 
-    const user = data
     const checkPassword = await bcrypt.compare(password, user.password)
-    if (!checkPassword) return res.status(401).json({ error: 'Credenciais inválidas' }) // Generic msg
+    if (!checkPassword) return res.status(401).json({ error: 'Credenciais inválidas' })
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
     res.json({ user, token })
