@@ -5,11 +5,12 @@ import swaggerUi from 'swagger-ui-express'
 import swaggerSpecs from './src/config/swagger.js'
 import authRoutes from './src/routes/authRoutes.js'
 import linkRoutes from './src/routes/linkRoutes.js'
+import { runMigrations } from './src/database/migrate.js'
 
 dotenv.config()
 
 const app = express()
-const PORT = process.env.PORT || 8080
+const PORT = process.env.PORT || 3000
 
 // Body parser
 app.use(express.json())
@@ -42,6 +43,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs))
 app.use('/auth', authRoutes)
 app.use('/links', linkRoutes)
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
+// Executa migrations e inicia o servidor
+runMigrations().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
+  })
 })
