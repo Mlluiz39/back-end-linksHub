@@ -14,11 +14,11 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:8080',
+        url: `http://localhost:${process.env.PORT || 3000}`,
         description: 'Servidor Local',
       },
       {
-         url: 'https://back-end-linkshub.onrender.com',
+         url: 'https://api-linkshub.mlluizdevtech.com.br',
          description: 'Servidor Produção'
       }
     ],
