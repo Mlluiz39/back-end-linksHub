@@ -25,13 +25,13 @@ export const getLinks = async (req, res) => {
 // Criar link
 export const createLink = async (req, res) => {
   try {
-    const { title, url } = linkSchema.parse(req.body)
-
     const id = nanoid() // Gerar ID curto e único
-
+    
+    const { title, url } = linkSchema.parse(req.body)
+    
     const { rows } = await pool.query(
       'INSERT INTO links (id, title, url, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, url, req.user.userId]
+      [id, title, url, req.user.userId]
     )
     res.status(201).json({ link: rows[0] })
   } catch (err) {
