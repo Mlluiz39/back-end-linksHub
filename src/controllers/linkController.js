@@ -1,5 +1,6 @@
 import pool from '../lib/db.js'
 import { z } from 'zod'
+import { nanoid } from "nanoid"
 
 // Schemas
 const linkSchema = z.object({
@@ -26,8 +27,10 @@ export const createLink = async (req, res) => {
   try {
     const { title, url } = linkSchema.parse(req.body)
 
+    const id = nanoid() // Gerar ID curto e único
+
     const { rows } = await pool.query(
-      'INSERT INTO links (title, url, user_id) VALUES ($1, $2, $3) RETURNING *',
+      'INSERT INTO links (id, title, url, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [title, url, req.user.userId]
     )
     res.status(201).json({ link: rows[0] })
@@ -116,7 +119,7 @@ export const restoreLinks = async (req, res) => {
       .map(link => {
         try {
           const { title, url } = linkSchema.parse(link)
-          return { title, url }
+          return {id: nanoid(), title, url }
         } catch {
           return null
         }
@@ -128,9 +131,9 @@ export const restoreLinks = async (req, res) => {
     }
 
     // Monta INSERT com múltiplos valores usando parâmetros
-    const values = linksToInsert.flatMap(({ title, url }) => [title, url, req.user.userId])
+    const values = linksToInsert.flatMap(({ id, title, url }) => [id, title, url, req.user.userId])
     const placeholders = linksToInsert
-      .map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`)
+      .map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`)
       .join(', ')
 
     const { rows } = await pool.query(

@@ -10,6 +10,7 @@ import {
   restoreLinks,
 } from '../controllers/linkController.js'
 
+
 const router = express.Router()
 
 router.use(authMiddleware)
