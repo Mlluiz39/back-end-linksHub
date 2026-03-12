@@ -52,7 +52,7 @@ API RESTful para gerenciamento de links pessoais. Permite que usuários cadastre
 |---|---|
 | **Node.js 20** | Runtime JavaScript |
 | **Express 5** | Framework HTTP |
-| **PostgreSQL** (Neon) | Banco de dados relacional |
+| **PostgreSQL** | Banco de dados relacional |
 | **JWT** | Autenticação stateless |
 | **bcrypt** | Hash de senhas |
 | **Zod** | Validação de schemas |
