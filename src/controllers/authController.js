@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-import pool from '../lib/db.js'
+import directus from '../lib/directus.js'
+import { readItems, createItem } from '@directus/sdk'
 import dotenv from 'dotenv'
 import { z } from 'zod'
 
@@ -48,21 +49,31 @@ export const registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const { rows } = await pool.query(
-      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
-      [name, email, hashedPassword]
+    // Verificar se o usuário já existe no Directus
+    const existingUsers = await directus.request(
+        readItems('users', {
+            filter: { email: { _eq: email } }
+        })
     )
 
-    const user = rows[0]
+    if (existingUsers.length > 0) {
+        return res.status(409).json({ error: 'E-mail já cadastrado' })
+    }
+
+    // Criar usuário no Directus
+    const user = await directus.request(
+        createItem('users', {
+            name,
+            email,
+            password: hashedPassword
+        })
+    )
+
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
     res.status(201).json({ user, token })
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: err.errors[0].message })
-    }
-    // Violação de unique constraint (e-mail duplicado)
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'E-mail já cadastrado' })
     }
     console.error('Erro no registro:', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -74,12 +85,14 @@ export const emailPasswordLogin = async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body)
 
-    const { rows } = await pool.query(
-      'SELECT * FROM users WHERE email = $1 LIMIT 1',
-      [email]
+    const users = await directus.request(
+        readItems('users', {
+            filter: { email: { _eq: email } },
+            limit: 1
+        })
     )
 
-    const user = rows[0]
+    const user = users[0]
     if (!user) return res.status(401).json({ error: 'Credenciais inválidas' })
 
     const checkPassword = await bcrypt.compare(password, user.password)

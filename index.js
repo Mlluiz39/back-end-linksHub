@@ -5,7 +5,7 @@ import swaggerUi from 'swagger-ui-express'
 import swaggerSpecs from './src/config/swagger.js'
 import authRoutes from './src/routes/authRoutes.js'
 import linkRoutes from './src/routes/linkRoutes.js'
-import { runMigrations } from './src/database/migrate.js'
+import { initDirectus } from './src/database/directusInit.js'
 
 dotenv.config()
 
@@ -43,8 +43,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs))
 app.use('/auth', authRoutes)
 app.use('/links', linkRoutes)
 
-// Executa migrations e inicia o servidor
-runMigrations().then(() => {
+// Inicia o servidor
+initDirectus().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
   })
